@@ -32,11 +32,13 @@ async function queryD1(sql) {
 }
 
 // 1. Fetch search data using Firecrawl (Search API)
+// 1. Fetch search data using Firecrawl (Robust V2 search)
 async function fetchTrendingTechNews() {
   console.log("Searching the web for latest tech and finance trends via Firecrawl...");
   const query = "latest breakthrough AI models vibe coding tech company stocks open source news 2026";
   
-  const response = await fetch("https://api.firecrawl.dev/v1/search", {
+  // Use the updated /v2/search endpoint
+  const response = await fetch("https://api.firecrawl.dev/v2/search", {
     method: "POST",
     headers: {
       "Authorization": `Bearer ${process.env.FIRECRAWL_API_KEY}`,
@@ -45,21 +47,38 @@ async function fetchTrendingTechNews() {
     body: JSON.stringify({
       query: query,
       limit: 5,
-      pageOptions: { onlyMainContent: true }
+      // Firecrawl uses scrapeOptions with formats for returning clean markdown in v2
+      scrapeOptions: {
+        formats: ["markdown"],
+        onlyMainContent: true
+      }
     })
   });
 
   if (!response.ok) {
-    throw new Error(`Firecrawl Search Failed: ${response.statusText}`);
+    const errorText = await response.text();
+    throw new Error(`Firecrawl Search Failed: ${response.status} - ${errorText}`);
   }
 
   const data = await response.json();
-  return data.data.map(item => `Source: ${item.url}\nTitle: ${item.title}\nContent: ${item.markdown.slice(0, 1500)}`).join("\n\n---\n\n");
+  
+  // Parse modern response (Checking for data or results array safely)
+  const results = data.data || data.results || [];
+  if (results.length === 0) {
+    console.warn("Firecrawl returned empty search results. Using mock fallback search context.");
+    return "Theme: AI agents development, Node.js serverless architectures, Cloudflare development tools, and stock market momentum in 2026.";
+  }
+
+  return results.map(item => {
+    const markdownContent = item.markdown || item.content || "";
+    return `Source: ${item.url || 'Unknown'}\nTitle: ${item.title || 'No Title'}\nContent: ${markdownContent.slice(0, 1500)}`;
+  }).join("\n\n---\n\n");
 }
 
 // 2. Fetch Unsplash images (Direct Raw URL)
+// 2. Fetch Unsplash images with optimized web-dimensions
 async function fetchUnsplashImages(topic, count = 11) {
-  console.log(`Fetching ${count} raw images from Unsplash for topic: ${topic}...`);
+  console.log(`Fetching ${count} images from Unsplash for topic: ${topic}...`);
   const response = await fetch(
     `https://api.unsplash.com/search/photos?query=${encodeURIComponent(topic)}&per_page=${count}&orientation=landscape`,
     {
@@ -69,11 +88,13 @@ async function fetchUnsplashImages(topic, count = 11) {
 
   if (!response.ok) {
     console.warn("Unsplash API failed, utilizing secure generic fallbacks.");
-    return Array(count).fill("https://images.unsplash.com/photo-1518770660439-4636190af475");
+    return Array(count).fill("https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1200&q=80");
   }
 
   const data = await response.json();
-  return data.results.map(img => img.urls.raw);
+  
+  // Append standard formatting modifiers to the raw url to optimize load speed and support markdown standards perfectly
+  return data.results.map(img => `${img.urls.raw}&auto=format&fit=crop&w=1200&q=80`);
 }
 
 // 3. Generate blog markdown using GitHub Models (GPT-4o API)
