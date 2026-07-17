@@ -31,6 +31,39 @@ async function queryD1(sql) {
   return result.result; // Returns query results array
 }
 
+// Helper to prune old posts and keep the database size capped at 500 rows
+async function pruneOldBlogPosts() {
+  console.log("Checking blog_posts table limit...");
+  
+  // 1. Get the current count of blog posts
+  const countResult = await queryD1("SELECT COUNT(*) as total FROM blog_posts");
+  const totalPosts = countResult[0]?.results[0]?.total || 0;
+  
+  console.log(`Current blog post count: ${totalPosts}`);
+  
+  if (totalPosts > 500) {
+    const overflowCount = totalPosts - 500;
+    console.log(`Pruning limit exceeded! Removing the oldest ${overflowCount} post(s)...`);
+    
+    // 2. Delete the oldest entries by ordering by created_at ascending
+    // Since SQLite's DELETE doesn't natively support LIMIT without specific compile options, 
+    // we use a subquery to select the IDs of the oldest N records.
+    const pruneSQL = `
+      DELETE FROM blog_posts 
+      WHERE id IN (
+        SELECT id FROM blog_posts 
+        ORDER BY created_at ASC 
+        LIMIT ${overflowCount}
+      );
+    `;
+    
+    await queryD1(pruneSQL);
+    console.log("Pruning completed successfully.");
+  } else {
+    console.log("Blog post count is within limits. No pruning needed.");
+  }
+}
+
 // 1. Fetch search data using Firecrawl (Robust V2 search extraction)
 async function fetchTrendingTechNews() {
   console.log("Searching the web for latest tech and finance trends via Firecrawl...");
@@ -274,6 +307,41 @@ async function main() {
     `;
     await queryD1(insertSQL);
 
+    // F. Write directly back to your D1 DB blog_posts
+    console.log("Saving generated post back to Cloudflare D1...");
+    const insertSQL = `
+      INSERT INTO blog_posts (title, slug, status, excerpt, content, cover_image, meta_title, meta_description, published_at)
+      VALUES (
+        '${generatedBlog.title.replace(/'/g, "''")}',
+        '${generatedBlog.slug}',
+        'published',
+        '${generatedBlog.excerpt.replace(/'/g, "''")}',
+        '${generatedBlog.content.replace(/'/g, "''")}',
+        '${images[0]}',
+        '${generatedBlog.title.replace(/'/g, "''")}',
+        '${generatedBlog.excerpt.replace(/'/g, "''")}',
+        datetime('now')
+      );
+    `;
+    await queryD1(insertSQL);
+
+    // ==========================================
+    // ADDED: PRUNE OVERFLOW ENTRIES HERE
+    // ==========================================
+    try {
+      await pruneOldBlogPosts();
+    } catch (pruneError) {
+      // Wrap in a try-catch so that if pruning ever fails, 
+      // it doesn't block the actual publishing step.
+      console.error("Non-blocking pruning error:", pruneError);
+    }
+    // ==========================================
+
+    // G. Cross-post automatically to Dev.to
+    await publishToDevTo(generatedBlog);
+
+    console.log("Automation task successfully executed!");
+    
     // G. Cross-post automatically to Dev.to
     await publishToDevTo(generatedBlog);
 
