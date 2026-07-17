@@ -1,0 +1,70 @@
+name = "blog-automation"
+main = "src/index.ts"
+type = "module"
+compatibility_date = "2024-12-19"
+
+# Environment configuration
+env = "production"
+
+# Triggers for scheduled execution
+triggers = [
+  { crons = ["0 9 * * *"] }  # Daily at 9 AM UTC
+]
+
+# D1 Database binding
+[[d1_databases]]
+binding = "DB"
+database_name = "blog_automation_db"
+database_id = "your-database-id-here"  # Replace with actual D1 database ID
+
+# R2 Bucket binding (optional - for image storage)
+# [[r2_buckets]]
+# binding = "BLOG_IMAGES"
+# bucket_name = "blog-images-bucket"
+
+# Environment variables - Production
+[env.production.vars]
+ENVIRONMENT = "production"
+
+[env.production.secrets]
+# API Keys (set via `wrangler secret put GITHUB_TOKEN` etc.)
+GITHUB_TOKEN = ""
+UNSPLASH_ACCESS_KEY = ""
+FIRECRAWL_API_KEY = ""
+DEV_TO_API_KEY = ""
+
+# Environment variables - Staging
+[env.staging.vars]
+ENVIRONMENT = "staging"
+
+[env.staging.secrets]
+GITHUB_TOKEN = ""
+UNSPLASH_ACCESS_KEY = ""
+FIRECRAWL_API_KEY = ""
+DEV_TO_API_KEY = ""
+
+# Environment variables - Development
+[env.development.vars]
+ENVIRONMENT = "development"
+
+[env.development.secrets]
+GITHUB_TOKEN = ""
+UNSPLASH_ACCESS_KEY = ""
+FIRECRAWL_API_KEY = ""
+DEV_TO_API_KEY = ""
+
+# Build configuration
+[build]
+command = "npm run build"
+cwd = "./"
+watch_paths = ["src/**/*.ts"]
+
+# Minify for production
+[build.upload]
+format = "modules"
+
+# Routes (optional)
+[[routes]]
+pattern = "https://yourdomain.com/api/*"
+zone_name = "yourdomain.com"
+custom_domain = true
