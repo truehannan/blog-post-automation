@@ -17,11 +17,12 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22  # Upgraded to modern Node 22 LTS to resolve deprecation warnings
+          node-version: 22
 
       - name: Install Dependencies
         run: |
-          npm init -y
+          # Generate a package.json declaring type as ES Module
+          echo '{"type": "module"}' > package.json
           npm install dotenv @octokit/core
 
       - name: Run Automation Script
@@ -31,7 +32,7 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           D1_DATABASE_ID: ${{ secrets.D1_DATABASE_ID }}
           
-          # APIS & Keys
+          # APIS & Keys (Using your updated Secret Name)
           GITHUB_MODELS_TOKEN: ${{ secrets.AI_MODELS_TOKEN_GITHUB }}
           UNSPLASH_ACCESS_KEY: ${{ secrets.UNSPLASH_ACCESS_KEY }}
           FIRECRAWL_API_KEY: ${{ secrets.FIRECRAWL_API_KEY }}
