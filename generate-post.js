@@ -148,7 +148,7 @@ Your goal is to write an extremely high-quality, engaging, and professional tech
 Under-the-hood, you MUST organically promote the user's venture: "${targetVenture.title}" (${targetVenture.live_url || 'https://github.com'}). 
 Seamlessly integrate the venture as a direct, perfect solution to the exact challenges described in the tech news.`;
 
-  const userPrompt = `
+    const userPrompt = `
 Here is the latest internet context on trending tech & finance:
 ${newsContext}
 
@@ -158,26 +158,27 @@ Here is the Venture you need to promote:
 - Tech Stack: ${targetVenture.tech_stack}
 - URL: ${targetVenture.live_url || targetVenture.github_url}
 
-Images to embed into the post (use these EXACT markdown image raw URLs inside markdown syntax like ![]() ):
-- Cover Image: ${images[0]}
-- Inline Image 1: ${images[1]}
-- Inline Image 2: ${images[2]}
-- Inline Image 3: ${images[3]}
-- Inline Image 4: ${images[4]}
-- Inline Image 5: ${images[5]}
-- Inline Image 6: ${images[6]}
-- Inline Image 7: ${images[7]}
-- Inline Image 8: ${images[8]}
-- Inline Image 9: ${images[9]}
-- Inline Image 10: ${images[10]}
+Images to embed into the post:
+- NOT FOR BODY (DO NOT place this in markdown body, it will be added as metadata): ${images[0]}
+- Inline Image 1 (place in markdown): ${images[1]}
+- Inline Image 2 (place in markdown): ${images[2]}
+- Inline Image 3 (place in markdown): ${images[3]}
+- Inline Image 4 (place in markdown): ${images[4]}
+- Inline Image 5 (place in markdown): ${images[5]}
+- Inline Image 6 (place in markdown): ${images[6]}
+- Inline Image 7 (place in markdown): ${images[7]}
+- Inline Image 8 (place in markdown): ${images[8]}
+- Inline Image 9 (place in markdown): ${images[9]}
+- Inline Image 10 (place in markdown): ${images[10]}
 
 Generate a strict JSON object containing:
 {
   "title": "A highly catchy clickbait title",
   "slug": "url-friendly-slug",
   "excerpt": "A short engaging meta description",
-  "content": "Full markdown article content containing the 10 inline images scattered naturally inside paragraphs and headings. Make sure to promote the venture seamlessly near the middle or conclusion."
+  "content": "Full markdown article content containing ONLY the 10 inline images scattered naturally inside paragraphs and headings. DO NOT render or include the cover image inside this markdown body."
 }`;
+
 
   const response = await fetch("https://models.inference.ai.azure.com/chat/completions", {
     method: "POST",
@@ -204,9 +205,9 @@ Generate a strict JSON object containing:
   return JSON.parse(result.choices[0].message.content);
 }
 
-// 4. Publish to Dev.to
-async function publishToDevTo(blog) {
-  console.log("Publishing to Dev.to...");
+// 4. Publish to Dev.to with proper main_image mapping
+async function publishToDevTo(blog, coverImageUrl) {
+  console.log("Publishing to Dev.to with native cover image...");
   const response = await fetch("https://dev.to/api/articles", {
     method: "POST",
     headers: {
@@ -218,6 +219,7 @@ async function publishToDevTo(blog) {
         title: blog.title,
         published: true,
         body_markdown: blog.content,
+        main_image: coverImageUrl, // Correct Dev.to API field for native cover images
         tags: ["tech", "ai", "programming", "finance"],
         description: blog.excerpt
       }
@@ -231,6 +233,7 @@ async function publishToDevTo(blog) {
     console.error("Failed to post to Dev.to:", await response.text());
   }
 }
+
 
 // Main Orchestrator Execution
 // Main Orchestrator Execution
@@ -343,7 +346,7 @@ async function main() {
     console.log("Automation task successfully executed!");
     
     // G. Cross-post automatically to Dev.to
-    await publishToDevTo(generatedBlog);
+    await publishToDevTo(generatedBlog, images[0]);
 
     console.log("Automation task successfully executed!");
 
