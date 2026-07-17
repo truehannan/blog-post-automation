@@ -31,13 +31,11 @@ async function queryD1(sql) {
   return result.result; // Returns query results array
 }
 
-// 1. Fetch search data using Firecrawl (Search API)
-// 1. Fetch search data using Firecrawl (Robust V2 search)
+// 1. Fetch search data using Firecrawl (Robust V2 search extraction)
 async function fetchTrendingTechNews() {
   console.log("Searching the web for latest tech and finance trends via Firecrawl...");
   const query = "latest breakthrough AI models vibe coding tech company stocks open source news 2026";
   
-  // Use the updated /v2/search endpoint
   const response = await fetch("https://api.firecrawl.dev/v2/search", {
     method: "POST",
     headers: {
@@ -47,7 +45,6 @@ async function fetchTrendingTechNews() {
     body: JSON.stringify({
       query: query,
       limit: 5,
-      // Firecrawl uses scrapeOptions with formats for returning clean markdown in v2
       scrapeOptions: {
         formats: ["markdown"],
         onlyMainContent: true
@@ -60,21 +57,33 @@ async function fetchTrendingTechNews() {
     throw new Error(`Firecrawl Search Failed: ${response.status} - ${errorText}`);
   }
 
-  const data = await response.json();
+  const payload = await response.json();
   
-  // Parse modern response (Checking for data or results array safely)
-  const results = data.data || data.results || [];
-  if (results.length === 0) {
-    console.warn("Firecrawl returned empty search results. Using mock fallback search context.");
+  // Cleanly extract the array of web results
+  let resultsArray = [];
+  if (payload && payload.data) {
+    // If payload.data.web is the array (Standard Firecrawl V2 structure)
+    if (Array.isArray(payload.data.web)) {
+      resultsArray = payload.data.web;
+    } 
+    // Fallback: If payload.data itself is an array
+    else if (Array.isArray(payload.data)) {
+      resultsArray = payload.data;
+    }
+  } else if (payload && Array.isArray(payload.results)) {
+    resultsArray = payload.results;
+  }
+
+  if (resultsArray.length === 0) {
+    console.warn("Firecrawl returned empty search results or unexpected format. Using mock fallback search context.");
     return "Theme: AI agents development, Node.js serverless architectures, Cloudflare development tools, and stock market momentum in 2026.";
   }
 
-  return results.map(item => {
+  return resultsArray.map(item => {
     const markdownContent = item.markdown || item.content || "";
     return `Source: ${item.url || 'Unknown'}\nTitle: ${item.title || 'No Title'}\nContent: ${markdownContent.slice(0, 1500)}`;
   }).join("\n\n---\n\n");
 }
-
 // 2. Fetch Unsplash images (Direct Raw URL)
 // 2. Fetch Unsplash images with optimized web-dimensions
 async function fetchUnsplashImages(topic, count = 11) {
