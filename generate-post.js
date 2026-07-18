@@ -46,8 +46,6 @@ async function pruneOldBlogPosts() {
     console.log(`Pruning limit exceeded! Removing the oldest ${overflowCount} post(s)...`);
     
     // 2. Delete the oldest entries by ordering by created_at ascending
-    // Since SQLite's DELETE doesn't natively support LIMIT without specific compile options, 
-    // we use a subquery to select the IDs of the oldest N records.
     const pruneSQL = `
       DELETE FROM blog_posts 
       WHERE id IN (
@@ -95,12 +93,9 @@ async function fetchTrendingTechNews() {
   // Cleanly extract the array of web results
   let resultsArray = [];
   if (payload && payload.data) {
-    // If payload.data.web is the array (Standard Firecrawl V2 structure)
     if (Array.isArray(payload.data.web)) {
       resultsArray = payload.data.web;
-    } 
-    // Fallback: If payload.data itself is an array
-    else if (Array.isArray(payload.data)) {
+    } else if (Array.isArray(payload.data)) {
       resultsArray = payload.data;
     }
   } else if (payload && Array.isArray(payload.results)) {
@@ -117,7 +112,7 @@ async function fetchTrendingTechNews() {
     return `Source: ${item.url || 'Unknown'}\nTitle: ${item.title || 'No Title'}\nContent: ${markdownContent.slice(0, 1500)}`;
   }).join("\n\n---\n\n");
 }
-// 2. Fetch Unsplash images (Direct Raw URL)
+
 // 2. Fetch Unsplash images with optimized web-dimensions
 async function fetchUnsplashImages(topic, count = 11) {
   console.log(`Fetching ${count} images from Unsplash for topic: ${topic}...`);
@@ -134,8 +129,6 @@ async function fetchUnsplashImages(topic, count = 11) {
   }
 
   const data = await response.json();
-  
-  // Append standard formatting modifiers to the raw url to optimize load speed and support markdown standards perfectly
   return data.results.map(img => `${img.urls.raw}&auto=format&fit=crop&w=1200&q=80`);
 }
 
@@ -148,7 +141,7 @@ Your goal is to write an extremely high-quality, engaging, and professional tech
 Under-the-hood, you MUST organically promote the user's venture: "${targetVenture.title}" (${targetVenture.live_url || 'https://github.com'}). 
 Seamlessly integrate the venture as a direct, perfect solution to the exact challenges described in the tech news.`;
 
-    const userPrompt = `
+  const userPrompt = `
 Here is the latest internet context on trending tech & finance:
 ${newsContext}
 
@@ -178,7 +171,6 @@ Generate a strict JSON object containing:
   "excerpt": "A short engaging meta description",
   "content": "Full markdown article content containing ONLY the 10 inline images scattered naturally inside paragraphs and headings. DO NOT render or include the cover image inside this markdown body."
 }`;
-
 
   const response = await fetch("https://models.inference.ai.azure.com/chat/completions", {
     method: "POST",
@@ -234,27 +226,19 @@ async function publishToDevTo(blog, coverImageUrl) {
   }
 }
 
-
-// Main Orchestrator Execution
 // Main Orchestrator Execution
 async function main() {
   try {
     console.log("Reading Ventures database table from D1 API...");
     
-    // 1. Fetch published ventures prioritized by sort_order
     const d1Result = await queryD1("SELECT * FROM ventures WHERE status = 'published' ORDER BY sort_order ASC LIMIT 1");
-    
-    // Print logs so you see exactly what is returned from Cloudflare D1
     console.log("D1 API Raw Response:", JSON.stringify(d1Result));
 
     let targetVenture = null;
 
-    // Safely extract from the first query result block
     if (d1Result && d1Result[0] && d1Result[0].results && d1Result[0].results.length > 0) {
       targetVenture = d1Result[0].results[0];
-    } 
-    // Fallback: If no "published" status ventures found, try finding ANY row from the table
-    else {
+    } else {
       console.log("No 'published' ventures found in results. Attempting fallback to any available row...");
       const fallbackResult = await queryD1("SELECT * FROM ventures ORDER BY sort_order ASC LIMIT 1");
       
@@ -263,9 +247,8 @@ async function main() {
       }
     }
 
-    // Secondary Safety Fallback: If your table is empty or the query returned nothing
     if (!targetVenture) {
-      console.warn("D1 ventures table query returned nothing. Generating fallback portfolio structure to prevent execution crash...");
+      console.warn("D1 ventures table query returned nothing. Generating fallback portfolio structure...");
       targetVenture = {
         title: "My Tech Studio",
         excerpt: "Building high-performance MVPs, decentralized serverless systems, and minimal premium digital designs.",
@@ -310,41 +293,13 @@ async function main() {
     `;
     await queryD1(insertSQL);
 
-    // F. Write directly back to your D1 DB blog_posts
-    console.log("Saving generated post back to Cloudflare D1...");
-    const insertSQL = `
-      INSERT INTO blog_posts (title, slug, status, excerpt, content, cover_image, meta_title, meta_description, published_at)
-      VALUES (
-        '${generatedBlog.title.replace(/'/g, "''")}',
-        '${generatedBlog.slug}',
-        'published',
-        '${generatedBlog.excerpt.replace(/'/g, "''")}',
-        '${generatedBlog.content.replace(/'/g, "''")}',
-        '${images[0]}',
-        '${generatedBlog.title.replace(/'/g, "''")}',
-        '${generatedBlog.excerpt.replace(/'/g, "''")}',
-        datetime('now')
-      );
-    `;
-    await queryD1(insertSQL);
-
-    // ==========================================
-    // ADDED: PRUNE OVERFLOW ENTRIES HERE
-    // ==========================================
+    // Prune overflow entries if total count exceeds 500 records
     try {
       await pruneOldBlogPosts();
     } catch (pruneError) {
-      // Wrap in a try-catch so that if pruning ever fails, 
-      // it doesn't block the actual publishing step.
       console.error("Non-blocking pruning error:", pruneError);
     }
-    // ==========================================
 
-    // G. Cross-post automatically to Dev.to
-    await publishToDevTo(generatedBlog);
-
-    console.log("Automation task successfully executed!");
-    
     // G. Cross-post automatically to Dev.to
     await publishToDevTo(generatedBlog, images[0]);
 
@@ -355,4 +310,5 @@ async function main() {
     process.exit(1);
   }
 }
+
 main();
