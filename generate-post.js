@@ -60,10 +60,23 @@ async function pruneOldBlogPosts() {
   }
 }
 
-// 1. Fetch search data using Firecrawl (Robust V2 search extraction)
+// 1. Fetch search data using Firecrawl (With Dynamic Randomized Queries)
 async function fetchTrendingTechNews() {
-  console.log("Searching the web for latest tech and finance trends via Firecrawl...");
-  const query = "latest breakthrough AI models vibe coding tech company stocks open source news 2026";
+  // Pool of radically different technical focus areas
+  const queryPool = [
+    "trending open source github repositories developer tools projects 2026",
+    "latest breakthrough AI models LLM engineering advancements 2026",
+    "tech company stocks market analysis nvidia apple microsoft updates 2026",
+    "serverless framework edge computing cloudflare architecture innovation 2026",
+    "vibe coding natural language programming software engineering future 2026",
+    "indie hacker micro saas building scaling tech startups 2026",
+    "database design technology distributed systems sqlite d1 planetscale 2026"
+  ];
+
+  // Pick a random query angle to change the news feed completely on each run
+  const randomQuery = queryPool[Math.floor(Math.random() * queryPool.length)];
+  console.log(`Selected dynamic news angle: "${randomQuery}"`);
+  console.log("Searching the web via Firecrawl...");
   
   const response = await fetch("https://api.firecrawl.dev/v2/search", {
     method: "POST",
@@ -72,7 +85,7 @@ async function fetchTrendingTechNews() {
       "Content-Type": "application/json"
     },
     body: JSON.stringify({
-      query: query,
+      query: randomQuery,
       limit: 5,
       scrapeOptions: {
         formats: ["markdown"],
@@ -101,7 +114,7 @@ async function fetchTrendingTechNews() {
 
   if (resultsArray.length === 0) {
     console.warn("Firecrawl returned empty search results. Using fallback context.");
-    return "Theme: AI agents development, Node.js serverless architectures, Cloudflare development tools, and stock market momentum in 2026.";
+    return `Theme context: ${randomQuery}`;
   }
 
   return resultsArray.map(item => {
@@ -111,7 +124,7 @@ async function fetchTrendingTechNews() {
 }
 
 // 2. Fetch a single unique image from Unsplash matching a custom query string
-async function fetchSingleUnsplashImage(query, fallbackKeyword = "technology") {
+async function fetchSingleUnsplashImage(query) {
   try {
     const response = await fetch(
       `https://api.unsplash.com/search/photos?query=${encodeURIComponent(query)}&per_page=3&orientation=landscape`,
@@ -122,15 +135,13 @@ async function fetchSingleUnsplashImage(query, fallbackKeyword = "technology") {
 
     const data = await response.json();
     if (data.results && data.results.length > 0) {
-      // Pick randomly from top 3 options to maximize randomness
       const randomIndex = Math.floor(Math.random() * Math.min(data.results.length, 3));
       return `${data.results[randomIndex].urls.raw}&auto=format&fit=crop&w=1200&q=80`;
     }
   } catch (err) {
-    console.warn(`Unsplash match failed for "${query}". Trying fallback keyword...`);
+    console.warn(`Unsplash match failed for "${query}". Using stable default asset.`);
   }
 
-  // Pure safety fallback
   return `https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1200&q=80`;
 }
 
@@ -139,9 +150,9 @@ async function generateBlogPostStructure(newsContext, targetVenture) {
   console.log("Generating tailored blog metadata & image keywords via GitHub Models...");
   
   const systemPrompt = `You are an elite software engineer, tech journalist, and startup founder. 
-Your goal is to write an extremely high-quality, engaging, and professional technical blog post targeting niches like AI, Vibe Coding, Tech Stocks, or Developer Careers.
+Your goal is to write an extremely high-quality, engaging, and professional technical blog post targeting niches like Open Source, AI engineering, Serverless development, Tech Stocks, or Developer Careers.
 Under-the-hood, you MUST organically promote the user's venture: "${targetVenture.title}" (${targetVenture.live_url || 'https://github.com'}). 
-Seamlessly integrate the venture as a direct, perfect solution to the exact challenges described in the tech news.`;
+Seamlessly integrate the venture as a direct, perfect solution to the exact challenges described in the tech news context provided.`;
 
   const userPrompt = `
 Here is the latest internet context on trending tech & finance:
@@ -155,12 +166,12 @@ Here is the Venture you need to promote:
 
 Generate a strict JSON object containing:
 {
-  "title": "A highly catchy clickbait title",
+  "title": "A highly catchy clickbait title relevant to the news",
   "slug": "url-friendly-slug",
   "excerpt": "A short engaging meta description",
   "content": "Full markdown article content text. Leave 10 distinct standalone token placeholders exactly formatted as [IMAGE_PLACEHOLDER_1], [IMAGE_PLACEHOLDER_2] ... up to [IMAGE_PLACEHOLDER_10] spread out cleanly between paragraphs or beneath subheadings where an image conceptually fits. Do not include or write any markdown imagery formatting for the cover image inside this text block.",
   "image_queries": [
-    "highly specific 3-4 word keyword match for a stunning article header layout image",
+    "highly specific 3-4 word keyword match for a stunning article header layout image matching the topic narrative",
     "query text for placeholder 1",
     "query text for placeholder 2",
     "query text for placeholder 3",
@@ -214,7 +225,7 @@ async function publishToDevTo(blog, coverImageUrl) {
         published: true,
         body_markdown: blog.content,
         main_image: coverImageUrl,
-        tags: ["tech", "ai", "programming", "finance"],
+        tags: ["tech", "ai", "programming", "opensource"],
         description: blog.excerpt
       }
     })
@@ -257,7 +268,7 @@ async function main() {
 
     console.log(`Successfully targeted venture for promotion: "${targetVenture.title}"`);
 
-    // A. Collect online facts and trigger AI generation blueprint
+    // A. Collect dynamically randomized search facts and trigger AI blueprint mapping
     const newsContext = await fetchTrendingTechNews();
     const generatedBlog = await generateBlogPostStructure(newsContext, targetVenture);
 
